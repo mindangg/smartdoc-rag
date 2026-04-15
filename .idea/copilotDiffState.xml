@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/services/document_service.py">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/services/document_service.py" />
+              <option name="originalContent" value="# app/services/document_service.py&#10;import os&#10;from langchain_community.document_loaders import PDFPlumberLoader&#10;from langchain_text_splitters import RecursiveCharacterTextSplitter&#10;from core.config import settings&#10;&#10;&#10;def process_pdf(file_path: str):&#10;    &quot;&quot;&quot;Đọc file PDF và chia nhỏ thành các chunks&quot;&quot;&quot;&#10;    if not os.path.exists(file_path):&#10;        raise FileNotFoundError(f&quot;Không tìm thấy file: {file_path}&quot;)&#10;&#10;    # 1. Load document&#10;    loader = PDFPlumberLoader(file_path)&#10;    docs = loader.load()&#10;&#10;    # 2. Split text&#10;    text_splitter = RecursiveCharacterTextSplitter(&#10;        chunk_size=settings.CHUNK_SIZE,&#10;        chunk_overlap=settings.CHUNK_OVERLAP&#10;    )&#10;    chunks = text_splitter.split_documents(docs)&#10;&#10;    return chunks" />
+              <option name="updatedContent" value="# app/services/document_service.py&#10;import os&#10;from langchain_community.document_loaders import PDFPlumberLoader&#10;from langchain_text_splitters import RecursiveCharacterTextSplitter&#10;from core.config import settings&#10;&#10;&#10;def process_pdf(file_path: str):&#10;    &quot;&quot;&quot;Đọc file PDF và chia nhỏ thành các chunks&quot;&quot;&quot;&#10;    if not os.path.exists(file_path):&#10;        raise FileNotFoundError(f&quot;Không tìm thấy file: {file_path}&quot;)&#10;&#10;    # 1. Load document&#10;    loader = PDFPlumberLoader(file_path)&#10;    docs = loader.load()&#10;&#10;    # 2. Split text&#10;    text_splitter = RecursiveCharacterTextSplitter(&#10;        chunk_size=settings.CHUNK_SIZE,&#10;        chunk_overlap=settings.CHUNK_OVERLAP&#10;    )&#10;    chunks = text_splitter.split_documents(docs)&#10;&#10;    return chunks" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>
