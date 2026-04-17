@@ -1,5 +1,9 @@
 from typing import Any, Dict, List, Optional
+
+from langchain_core.embeddings import Embeddings
 from pydantic import BaseModel, Field
+from sentence_transformers import SentenceTransformer
+
 
 class UploadProgressEvent(BaseModel):
     step: str
@@ -41,3 +45,29 @@ class HealthResponse(BaseModel):
     vector_count: int
     llm_url: str
     model: str
+
+class MPNetEmbeddings(Embeddings):
+    def __init__(self, model_name: str):
+        self._model = SentenceTransformer(model_name)
+        self.model_name = model_name
+        self.dimension = self._model.get_embedding_dimension()
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        embeddings = self._model.encode(
+            texts,
+            batch_size=32,
+            show_progress_bar=False,
+            normalize_embeddings=True,
+        )
+        return embeddings.tolist()
+
+    def embed_query(self, text: str) -> List[float]:
+        embedding = self._model.encode(
+            [text],
+            show_progress_bar=False,
+            normalize_embeddings=True,
+        )
+        return embedding[0].tolist()
+
+    def encode(self, texts: List[str], **kwargs):
+        return self._model.encode(texts, normalize_embeddings=True, **kwargs)
