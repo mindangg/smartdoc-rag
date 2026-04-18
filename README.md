@@ -99,22 +99,37 @@ Trên Google Colab, chạy Ollama và expose qua Ngrok:
 
 ```python
 # Cell 1 — Cài đặt
-!curl -fsSL https://ollama.ai/install.sh | sh
-!pip install pyngrok
+!apt-get update
+!apt-get install -y zstd
+!curl -fsSL https://ollama.com/install.sh | sh
+
+import os
+import threading
+import subprocess
+import time
+
+def run_ollama():
+    os.environ['OLLAMA_HOST'] = '0.0.0.0:11434'
+    subprocess.run(['ollama', 'serve'])
+
+threading.Thread(target=run_ollama, daemon=True).start()
+
+time.sleep(10)
+print("Ollama server đã sẵn sàng!")
 
 # Cell 2 — Khởi động Ollama
-import subprocess
-subprocess.Popen(["ollama", "serve"])
+!ollama run qwen2.5:7b "Chào bạn, bạn đang chạy trên Google Colab phải không?"
 
 # Cell 3 — Pull model
-!ollama pull llama3.2
+!pip install pyngrok
 
-# Cell 4 — Expose qua Ngrok
 from pyngrok import ngrok
-ngrok.set_auth_token("YOUR_NGROK_TOKEN")
-tunnel = ngrok.connect(11434)
-print("NGROK_LLM_URL =", tunnel.public_url)
+conf = ngrok.set_auth_token("YOUR_NGROK_AUTH_TOKEN")  # Thay bằng auth token của bạn
+
+public_url = ngrok.connect(11434, "http")
+print(f"Địa chỉ API Ollama công khai của bạn là: {public_url}")
 # Copy URL này vào .env
+
 ```
 
 ---

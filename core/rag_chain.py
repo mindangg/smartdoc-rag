@@ -1,12 +1,11 @@
 import logging
-from typing import List, Dict, Any
+from typing import List
 
 from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from core.llm import get_llm, ANTI_HALLUCINATION_SYSTEM_PROMPT
 from core.retriever import retrieve_with_scores
-from core.vector_store import get_vector_store
 
 logger = logging.getLogger(__name__)
 
