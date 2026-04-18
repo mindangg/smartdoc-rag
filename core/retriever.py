@@ -18,11 +18,3 @@ def retrieve_with_scores(
     results = vector_store.similarity_search_with_score(query, k=k)
     logger.debug(f"Retrieved {len(results)} docs for query: {query[:60]!r}")
     return results
-
-
-def retrieve(
-    query: str,
-    vector_store: FAISS,
-    k: int = TOP_K_DEFAULT,
-) -> List[Document]:
-    return [doc for doc, _ in retrieve_with_scores(query, vector_store, k=k)]

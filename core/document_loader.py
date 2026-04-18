@@ -129,9 +129,6 @@ def _load_image(
         ]
     return []
 
-
-# ── Helper ────────────────────────────────────────────────────────────────────
-
 def _emit(
     callback: Optional[ProgressCallback],
     step: str,

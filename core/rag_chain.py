@@ -30,41 +30,6 @@ def format_context(docs: List[Document]) -> str:
 
     return "\n\n" + ("─" * 60 + "\n\n").join(parts)
 
-async def run_standard_rag(query: str) -> Dict[str, Any]:
-    vs = get_vector_store()
-    if vs is None:
-        return {
-            "answer": (
-                "Chưa có tài liệu nào được tải lên. "
-                "Vui lòng upload tài liệu trước."
-            ),
-            "docs": [],
-            "context": "",
-            "used_web": False,
-        }
-
-    results = retrieve_with_scores(query, vs)
-    docs = [doc for doc, _ in results]
-
-    logger.info(f"Standard RAG retrieved {len(docs)} docs for: {query[:60]!r}")
-
-    context = format_context(docs)
-    system_content = ANTI_HALLUCINATION_SYSTEM_PROMPT.format(context=context)
-    messages = [
-        SystemMessage(content=system_content),
-        HumanMessage(content=query),
-    ]
-
-    llm = get_llm()
-    response = await llm.ainvoke(messages)
-
-    return {
-        "answer": response.content,
-        "docs": docs,
-        "context": context,
-        "used_web": False,
-    }
-
 async def run_rag_with_streaming(
     query: str,
     vector_store,
