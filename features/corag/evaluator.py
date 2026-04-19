@@ -7,7 +7,7 @@ from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
-RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.35"))
+RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.6"))
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 MAX_PASSAGE_CHARS = 512 
 

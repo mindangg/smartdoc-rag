@@ -1,108 +1,18 @@
 import asyncio
 import logging
-from typing import TypedDict, List, Dict, Any
+from typing import List, Dict, Any
 
-from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage, HumanMessage
-from langgraph.graph import StateGraph, END
 
 from core.llm import get_llm, ANTI_HALLUCINATION_SYSTEM_PROMPT
 from core.rag_chain import format_context
 from core.retriever import retrieve_with_scores
-from features.corag.evaluator import evaluate_context_relevance
-from features.corag.web_search import search_web, web_results_to_docs
 from features.citation_tracker import build_citations
+from features.corag.evaluator import evaluate_context_relevance
+from features.corag.rewriter import rewrite_query
+from features.corag.web_search import search_web, web_results_to_docs
 
 logger = logging.getLogger(__name__)
-
-class CoRAGState(TypedDict):
-    query: str
-    retrieved_docs: List[Document]
-    web_results: List[Dict[str, Any]]
-    relevance_score: float
-    relevance_decision: str
-    combined_context: str
-    answer: str
-    citations: List[Dict[str, Any]]
-    used_web: bool
-
-def build_corag_graph(vector_store):
-
-    def retrieve_node(state: CoRAGState) -> dict:
-        results = retrieve_with_scores(state["query"], vector_store)
-        docs = [doc for doc, _ in results]
-        return {"retrieved_docs": docs}
-
-    def evaluate_node(state: CoRAGState) -> dict:
-        score, decision, _ = evaluate_context_relevance(
-            state["query"], state["retrieved_docs"]
-        )
-        return {
-            "relevance_score": score,
-            "relevance_decision": decision,
-        }
-
-    def web_search_node(state: CoRAGState) -> dict:
-        results = search_web(state["query"])
-        return {"web_results": results, "used_web": True}
-
-    def generate_node(state: CoRAGState) -> dict:
-        combined_docs = list(state.get("retrieved_docs", []))
-        web_docs = web_results_to_docs(state.get("web_results", []))
-        all_docs = (combined_docs + web_docs)[:8]
-
-        context = format_context(all_docs)
-        system_content = ANTI_HALLUCINATION_SYSTEM_PROMPT.format(context=context)
-        messages = [
-            SystemMessage(content=system_content),
-            HumanMessage(content=state["query"]),
-        ]
-
-        llm = get_llm(streaming=False)
-        response = llm.invoke(messages)
-
-        citations = build_citations(
-            state.get("retrieved_docs", []),
-            state.get("web_results", []),
-        )
-
-        return {
-            "combined_context": context,
-            "answer": response.content,
-            "citations": citations,
-        }
-
-    # ── Routing ────────────────────────────────────────────────────────────
-
-    def route_after_evaluate(state: CoRAGState) -> str:
-        return (
-            "web_search"
-            if state["relevance_decision"] == "insufficient"
-            else "generate"
-        )
-
-    # ── Build graph ────────────────────────────────────────────────────────
-
-    graph = StateGraph(CoRAGState)
-    graph.add_node("retrieve", retrieve_node)
-    graph.add_node("evaluate", evaluate_node)
-    graph.add_node("web_search", web_search_node)
-    graph.add_node("generate", generate_node)
-
-    graph.set_entry_point("retrieve")
-    graph.add_edge("retrieve", "evaluate")
-    graph.add_conditional_edges(
-        "evaluate",
-        route_after_evaluate,
-        {
-            "web_search": "web_search",
-            "generate": "generate",
-        },
-    )
-    graph.add_edge("web_search", "generate")
-    graph.add_edge("generate", END)
-
-    return graph.compile()
 
 async def run_corag_with_streaming(
     query: str,
@@ -143,19 +53,50 @@ async def run_corag_with_streaming(
         )
         await emit(
             "evaluation_done",
-            f"Độ liên quan: {score:.2f} → {'Đủ tốt' if decision == 'relevant' else 'Không đủ ⚠️'}",
+            f"Độ liên quan: {score:.2f} → {'Đủ tốt' if decision == 'relevant' else 'Không đủ'}",
             score=round(score, 3),
             decision=decision,
         )
 
-        # ── Step 3: Web Search (conditional) ──────────────────────────────
+        # ── Step 3: Rewrite and Re-retrieve (conditional) ───────────────────
+        if decision == "insufficient":
+            await emit(
+                "rewriting_query", 
+                "Context gốc chưa đủ tốt. Đang phân tích và viết lại câu truy vấn để thử tìm kiếm lại..."
+            )
+            rewritten = await loop.run_in_executor(None, lambda: rewrite_query(query))
+            await emit("re_retrieval", f"Tìm kiếm lại với truy vấn: '{rewritten}'")
+            
+            new_results = await loop.run_in_executor(
+                None, lambda: retrieve_with_scores(rewritten, vector_store)
+            )
+            new_docs = [doc for doc, _ in new_results]
+            
+            seen = set(d.page_content for d in docs)
+            for d in new_docs:
+                if d.page_content not in seen:
+                    docs.append(d)
+                    seen.add(d.page_content)
+                    
+            await emit("re_evaluating", "Đang đánh giá lại ngữ cảnh sau khi thử lại...")
+            score, decision, _ = await loop.run_in_executor(
+                None, lambda: evaluate_context_relevance(query, docs)
+            )
+            await emit(
+                "re_evaluation_done",
+                f"Độ liên quan mới: {score:.2f} → {'Đủ tốt' if decision == 'relevant' else 'Vẫn không đủ'}",
+                score=round(score, 3),
+                decision=decision,
+            )
+
+        # ── Step 4: Web Search (conditional) ──────────────────────────────
         web_results: List[Dict[str, Any]] = []
         used_web = False
 
         if decision == "insufficient":
             await emit(
                 "web_search",
-                f"Context không đủ (score={score:.2f} < threshold). Đang tìm kiếm web…",
+                f"Context vẫn chưa đủ (score={score:.2f} < threshold). Bắt đầu tìm kiếm web…",
                 score=round(score, 3),
             )
             web_results = await loop.run_in_executor(None, lambda: search_web(query))
