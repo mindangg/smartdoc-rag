@@ -14,12 +14,12 @@ from features.corag.web_search import search_web, web_results_to_docs
 
 logger = logging.getLogger(__name__)
 
-async def run_corag_with_streaming(
-    query: str,
-    vector_store,
-    event_queue: asyncio.Queue,
-) -> None:
 
+async def run_corag_with_streaming(
+        query: str,
+        vector_store,
+        event_queue: asyncio.Queue,
+) -> None:
     async def emit(step: str, message: str, **extra) -> None:
         payload = {"source": "corag", "step": step, "message": message, **extra}
         await event_queue.put(payload)
@@ -61,23 +61,23 @@ async def run_corag_with_streaming(
         # ── Step 3: Rewrite and Re-retrieve (conditional) ───────────────────
         if decision == "insufficient":
             await emit(
-                "rewriting_query", 
+                "rewriting_query",
                 "Context gốc chưa đủ tốt. Đang phân tích và viết lại câu truy vấn để thử tìm kiếm lại..."
             )
             rewritten = await loop.run_in_executor(None, lambda: rewrite_query(query))
             await emit("re_retrieval", f"Tìm kiếm lại với truy vấn: '{rewritten}'")
-            
+
             new_results = await loop.run_in_executor(
                 None, lambda: retrieve_with_scores(rewritten, vector_store)
             )
             new_docs = [doc for doc, _ in new_results]
-            
+
             seen = set(d.page_content for d in docs)
             for d in new_docs:
                 if d.page_content not in seen:
                     docs.append(d)
                     seen.add(d.page_content)
-                    
+
             await emit("re_evaluating", "Đang đánh giá lại ngữ cảnh sau khi thử lại...")
             score, decision, _ = await loop.run_in_executor(
                 None, lambda: evaluate_context_relevance(query, docs)

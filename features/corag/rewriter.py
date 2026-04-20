@@ -14,6 +14,7 @@ Quy tắc:
 3. CHỈ TRẢ VỀ CÂU TRUY VẤN MỚI, tuyệt đối không giải thích hay thừa lời.
 """
 
+
 def rewrite_query(original_query: str) -> str:
     logger.info(f"Rewriting query: {original_query}")
     try:

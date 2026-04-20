@@ -8,9 +8,10 @@ logger = logging.getLogger(__name__)
 
 MAX_RESULTS_DEFAULT = 5
 
+
 def search_web(
-    query: str,
-    max_results: int = MAX_RESULTS_DEFAULT,
+        query: str,
+        max_results: int = MAX_RESULTS_DEFAULT,
 ) -> List[Dict[str, Any]]:
     api_key = os.getenv("TAVILY_API_KEY", "").strip()
 
@@ -44,10 +45,11 @@ def web_results_to_docs(results: List[Dict[str, Any]]) -> List[Document]:
         )
     return docs
 
+
 def _tavily_search(
-    query: str,
-    max_results: int,
-    api_key: str,
+        query: str,
+        max_results: int,
+        api_key: str,
 ) -> List[Dict[str, Any]]:
     try:
         from tavily import TavilyClient
@@ -72,9 +74,10 @@ def _tavily_search(
         logger.warning(f"Tavily search failed: {e}. Falling back to DuckDuckGo.")
         return _duckduckgo_search(query, max_results)
 
+
 def _duckduckgo_search(
-    query: str,
-    max_results: int,
+        query: str,
+        max_results: int,
 ) -> List[Dict[str, Any]]:
     try:
         from duckduckgo_search import DDGS

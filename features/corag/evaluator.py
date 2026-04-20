@@ -7,9 +7,9 @@ from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
-RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.6"))
+RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.8"))
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-MAX_PASSAGE_CHARS = 512 
+MAX_PASSAGE_CHARS = 512
 
 _cross_encoder: Optional[CrossEncoder] = None
 
@@ -24,9 +24,9 @@ def get_cross_encoder() -> CrossEncoder:
 
 
 def evaluate_context_relevance(
-    query: str,
-    docs: List[Document],
-    threshold: float = RELEVANCE_THRESHOLD,
+        query: str,
+        docs: List[Document],
+        threshold: float = RELEVANCE_THRESHOLD,
 ) -> Tuple[float, str, List[float]]:
     if not docs:
         logger.info("No documents retrieved — context is insufficient.")
