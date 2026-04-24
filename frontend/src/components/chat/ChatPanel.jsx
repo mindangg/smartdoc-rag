@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import useChatStore from '../../store/chatStore'
-import { queryDocuments } from '../../services/api'
+import { queryDocuments, clearChatHistory, fetchChatHistory } from '../../services/api'
 import MessageBubble from './MessageBubble'
 import QueryProgress from '../query/QueryProgress'
 
@@ -18,17 +18,42 @@ export default function ChatPanel() {
     addMessage,
     updateLastAssistantMessage,
     clearMessages,
+    setMessages,
     isQuerying,
     setIsQuerying,
     pushQueryStep,
     resetQuery,
     vectorCount,
+    sessionId,
   } = useChatStore()
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Fetch chat history on mount
+  useEffect(() => {
+    fetchChatHistory(sessionId)
+      .then(res => {
+        if (res.status === 'success' && res.messages) {
+          const loadedMsgs = res.messages.map((m, i) => ({
+            id: Date.now() + i,
+            role: m.role,
+            content: m.role === 'user' ? m.content : undefined,
+            coragContent: m.role === 'assistant' ? m.content : undefined,
+            ragContent: m.role === 'assistant' ? m.content : undefined,
+            ragDone: true,
+            coragDone: true,
+            usedWeb: m.used_web || false,
+            ragCitations: m.citations || [],
+            coragCitations: m.citations || []
+          }))
+          setMessages(loadedMsgs)
+        }
+      })
+      .catch(console.error)
+  }, [sessionId, setMessages])
 
   const handleSubmit = useCallback(async () => {
     const question = input.trim()
@@ -128,6 +153,16 @@ export default function ChatPanel() {
 
   const canSend = input.trim().length > 0 && !isQuerying
 
+  const handleClearChat = async () => {
+    try {
+      await clearChatHistory(sessionId)
+      clearMessages()
+    } catch (err) {
+      console.error(err)
+      alert('Lỗi khi xóa lịch sử chat: ' + err.message)
+    }
+  }
+
   return (
     <main className="chat-panel">
       {/* Header */}
@@ -143,7 +178,7 @@ export default function ChatPanel() {
         {messages.length > 0 && (
           <button
             id="clear-chat-btn"
-            onClick={clearMessages}
+            onClick={handleClearChat}
             title="Xóa cuộc hội thoại"
             style={{
               background: 'none',

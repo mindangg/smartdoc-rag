@@ -108,6 +108,7 @@ async def run_corag_with_streaming(
     query: str,
     vector_store,
     event_queue: asyncio.Queue,
+    session_id: str = "default"
 ) -> None:
 
     async def emit(step: str, message: str, **extra) -> None:
@@ -178,16 +179,27 @@ async def run_corag_with_streaming(
         combined_docs = docs + web_results_to_docs(web_results)
         all_docs = combined_docs[:8]
         context = format_context(all_docs)
-        system_content = ANTI_HALLUCINATION_SYSTEM_PROMPT.format(context=context)
-        messages = [
-            SystemMessage(content=system_content),
-            HumanMessage(content=query),
-        ]
+        system_content = ANTI_HALLUCINATION_SYSTEM_PROMPT
+        
+        from core.memory import get_chat_history
+        history = get_chat_history(session_id)
+        # Lấy 4 tin nhắn gần nhất (2 lượt hỏi-đáp)
+        history_messages = history.messages[-4:] if len(history.messages) > 0 else []
+        
+        messages = [SystemMessage(content=system_content)]
+        messages.extend(history_messages)
+        
+        # Nhét tài liệu trực tiếp vào câu hỏi
+        user_content = f"TÀI LIỆU TRÍCH XUẤT (CONTEXT):\n{context}\n\nCÂU HỎI CỦA TÔI:\n{query}"
+        messages.append(HumanMessage(content=user_content))
 
         llm = get_llm(streaming=False)
         response = await loop.run_in_executor(None, lambda: llm.invoke(messages))
-
+        
         citations = build_citations(docs, web_results)
+        
+        # KHÔNG LƯU VÀO HISTORY Ở ĐÂY NỮA
+        # RAG_CHAIN sẽ chịu trách nhiệm lưu để tránh bị ghi đúp 2 lần (Race Condition)
 
         # ── Final answer event ─────────────────────────────────────────────
         await emit(

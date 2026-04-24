@@ -69,6 +69,7 @@ async def run_rag_with_streaming(
     query: str,
     vector_store,
     event_queue,
+    session_id: str = "default"
 ) -> None:
     async def emit(step: str, message: str, **extra) -> None:
         payload = {"source": "rag", "step": step, "message": message, **extra}
@@ -91,17 +92,33 @@ async def run_rag_with_streaming(
 
         await emit("generating", "Đang sinh câu trả lời (RAG)...")
         context = format_context(docs)
-        system_content = ANTI_HALLUCINATION_SYSTEM_PROMPT.format(context=context)
-        messages = [
-            SystemMessage(content=system_content),
-            HumanMessage(content=query),
-        ]
+        system_content = ANTI_HALLUCINATION_SYSTEM_PROMPT
+        
+        from core.memory import get_chat_history
+        history = get_chat_history(session_id)
+        # Lấy 4 tin nhắn gần nhất (2 lượt hỏi-đáp) để tránh loãng ngữ cảnh
+        history_messages = history.messages[-4:] if len(history.messages) > 0 else []
+        
+        messages = [SystemMessage(content=system_content)]
+        messages.extend(history_messages)
+        
+        # Nhét tài liệu trực tiếp vào câu hỏi cuối cùng
+        user_content = f"TÀI LIỆU TRÍCH XUẤT (CONTEXT):\n{context}\n\nCÂU HỎI CỦA TÔI:\n{query}"
+        messages.append(HumanMessage(content=user_content))
 
         llm = get_llm(streaming=False)
         response = await loop.run_in_executor(None, lambda: llm.invoke(messages))
         
+        from langchain_core.messages import AIMessage
         from features.citation_tracker import build_citations
         citations = build_citations(docs, [])
+
+        # Save to memory with citations
+        history.add_user_message(query)
+        history.add_message(AIMessage(
+            content=response.content,
+            additional_kwargs={"citations": citations, "used_web": False}
+        ))
 
         await emit(
             "answer", 

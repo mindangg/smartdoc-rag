@@ -12,7 +12,8 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import upload, query
+from api.routes import upload, query, history
+from core.database import init_db
 
 app = FastAPI(
     title="SmartDoc RAG API",
@@ -21,6 +22,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+@app.on_event("startup")
+async def startup_event():
+    init_db()
 
 # ---- CORS ---------------------------------------------------------------
 # Allow React dev server + production origins
@@ -39,6 +44,7 @@ app.add_middleware(
 # ---- Routes -------------------------------------------------------------
 app.include_router(upload.router, prefix="/api", tags=["Document Upload"])
 app.include_router(query.router, prefix="/api", tags=["Query"])
+app.include_router(history.router, prefix="/api", tags=["History"])
 
 
 # ---- Health check -------------------------------------------------------

@@ -63,3 +63,28 @@ export function queryDocuments({ question, sessionId = 'default', onEvent, onErr
     onError,
   })
 }
+
+// ── History ───────────────────────────────────────────────────────────────────
+export async function fetchDocuments(sessionId = 'default') {
+  const res = await fetch(BASE + `/documents?session_id=${sessionId}`)
+  if (!res.ok) throw new Error('Failed to fetch documents')
+  return res.json()
+}
+
+export async function fetchChatHistory(sessionId = 'default') {
+  const res = await fetch(BASE + `/history/chat?session_id=${sessionId}`)
+  if (!res.ok) throw new Error('Failed to fetch chat history')
+  return res.json()
+}
+
+export async function clearChatHistory(sessionId = 'default') {
+  const res = await fetch(BASE + `/history/chat?session_id=${sessionId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to clear chat history')
+  return res.json()
+}
+
+export async function clearDocuments(sessionId = 'default') {
+  const res = await fetch(BASE + `/history/documents?session_id=${sessionId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to clear documents')
+  return res.json()
+}

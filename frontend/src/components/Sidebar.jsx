@@ -1,9 +1,28 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import useChatStore from '../store/chatStore'
 import DropZone from './upload/DropZone'
+import { fetchDocuments, clearDocuments } from '../services/api'
 
 export default function Sidebar() {
-  const { documents, vectorCount } = useChatStore()
+  const { documents, vectorCount, setDocuments, clearAllDocuments, sessionId } = useChatStore()
+
+  useEffect(() => {
+    fetchDocuments(sessionId)
+      .then(docs => setDocuments(docs))
+      .catch(console.error)
+  }, [sessionId, setDocuments])
+
+  const handleClearDocs = async () => {
+    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ tài liệu đã upload? Việc này sẽ reset Vector DB.')) {
+      try {
+        await clearDocuments(sessionId)
+        clearAllDocuments()
+      } catch (err) {
+        console.error(err)
+        alert('Lỗi khi xóa tài liệu: ' + err.message)
+      }
+    }
+  }
 
   return (
     <aside className="sidebar">
@@ -22,8 +41,17 @@ export default function Sidebar() {
 
       {/* Documents List */}
       <div className="doc-list">
-        <div className="doc-list-header">
-          Tài liệu đã tải ({documents.length})
+        <div className="doc-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Tài liệu đã tải ({documents.length})</span>
+          {documents.length > 0 && (
+            <button 
+              onClick={handleClearDocs} 
+              style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--rose-400)', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', padding: '2px 6px' }}
+              title="Xóa Vector Store"
+            >
+              Xóa
+            </button>
+          )}
         </div>
 
         {documents.length === 0 && (

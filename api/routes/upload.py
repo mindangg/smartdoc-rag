@@ -24,7 +24,7 @@ MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".png", ".jpg", ".jpeg",
-    ".tiff", ".tif", ".bmp", ".webp",
+    ".tiff", ".tif", ".bmp", ".webp", ".docx",
 }
 
 TMP_DIR = Path("./data/uploads")
@@ -62,6 +62,16 @@ async def _process_upload(file_path: str, filename: str) -> AsyncGenerator[str, 
         yield _sse({"step": "indexing", "message": "Đang lưu vào Vector Store", "progress": 85})
 
         await asyncio.to_thread(add_documents, chunks)
+
+        from core.database import SessionLocal, UploadedFile
+        with SessionLocal() as db:
+            db_file = UploadedFile(
+                filename=filename,
+                chunk_count=len(chunks),
+                session_id="default"
+            )
+            db.add(db_file)
+            db.commit()
 
         total_vectors = get_document_count()
         yield _sse({

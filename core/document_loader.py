@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 from easyocr import Reader
 from langchain_core.documents import Document
+import docx
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ def load_document(
         return _load_pdf(file_path, source, progress_callback)
     elif suffix in {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp"}:
         return _load_image(file_path, source, progress_callback)
+    elif suffix == ".docx":
+        return _load_docx(file_path, source, progress_callback)
     else:
         raise ValueError(f"Unsupported file type: {suffix!r}")
 
@@ -124,6 +127,52 @@ def _load_image(
                     "page": 1,
                     "total_pages": 1,
                     "file_type": "image",
+                },
+            )
+        ]
+    return []
+
+# ── DOCX Loading ──────────────────────────────────────────────────────────────
+def _load_docx(
+    file_path: str,
+    source: str,
+    callback: Optional[ProgressCallback],
+) -> List[Document]:
+    _emit(callback, "ocr", 20, "Đang đọc file Word (DOCX)…")
+    
+    try:
+        doc = docx.Document(file_path)
+    except Exception as e:
+        logger.error(f"Failed to open DOCX: {e}")
+        return []
+
+    full_text = []
+    
+    # Text from paragraphs
+    for para in doc.paragraphs:
+        if para.text.strip():
+            full_text.append(para.text.strip())
+            
+    # Text from tables
+    for table in doc.tables:
+        for row in table.rows:
+            row_data = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if row_data:
+                full_text.append(" | ".join(row_data))
+                
+    text = "\n".join(full_text)
+    
+    _emit(callback, "ocr_done", 65, "Đã đọc xong nội dung từ DOCX.")
+    
+    if text.strip():
+        return [
+            Document(
+                page_content=text.strip(),
+                metadata={
+                    "source": source,
+                    "page": 1,
+                    "total_pages": 1,
+                    "file_type": "docx",
                 },
             )
         ]

@@ -4,15 +4,21 @@
 import { create } from 'zustand'
 
 const useChatStore = create((set, get) => ({
+  sessionId: 'default',
+  setSessionId: (id) => set({ sessionId: id }),
+
   // ── Documents ─────────────────────────────────────────────────────────────
   documents: [],          // { id, name, chunks, vectors, uploadedAt }
   vectorCount: 0,
   addDocument: (doc) =>
     set((s) => ({ documents: [doc, ...s.documents] })),
+  setDocuments: (docs) => set({ documents: docs }),
   setVectorCount: (n) => set({ vectorCount: n }),
+  clearAllDocuments: () => set({ documents: [], vectorCount: 0 }),
 
   // ── Chat Messages ─────────────────────────────────────────────────────────
   messages: [],           // { id, role, ragContent, coragContent, ragCitations, coragCitations, usedWeb, ts, ragDone, coragDone }
+  setMessages: (msgs) => set({ messages: msgs }),
   addMessage: (msg) =>
     set((s) => ({ messages: [...s.messages, msg] })),
   updateLastAssistantMessage: (patch) =>

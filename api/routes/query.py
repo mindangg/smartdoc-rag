@@ -24,10 +24,10 @@ async def query_documents(request: QueryRequest):
         vector_store = get_vector_store()
 
         task_rag = asyncio.create_task(
-            run_rag_with_streaming(question, vector_store, queue)
+            run_rag_with_streaming(question, vector_store, queue, request.session_id)
         )
         task_corag = asyncio.create_task(
-            run_corag_with_streaming(question, vector_store, queue)
+            run_corag_with_streaming(question, vector_store, queue, request.session_id)
         )
 
         async def wait_all():
