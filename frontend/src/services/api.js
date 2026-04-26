@@ -63,3 +63,25 @@ export function queryDocuments({ question, sessionId = 'default', onEvent, onErr
     onError,
   })
 }
+
+// ── History ───────────────────────────────────────────────────────────────────
+export async function fetchHistory(sessionId = 'default') {
+  const res = await fetch(`${BASE}/history?session_id=${encodeURIComponent(sessionId)}`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()   // { session_id, items, count }
+}
+
+export async function clearHistory(sessionId = 'default') {
+  const res = await fetch(`${BASE}/history?session_id=${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+// ── Vector Store ──────────────────────────────────────────────────────────────
+export async function clearVectorStore() {
+  const res = await fetch(`${BASE}/vectorstore`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}

@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 from easyocr import Reader
 from langchain_core.documents import Document
+from langchain_community.document_loaders import Docx2txtLoader
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +47,10 @@ def load_document(
         return _load_pdf(file_path, source, progress_callback)
     elif suffix in {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp"}:
         return _load_image(file_path, source, progress_callback)
+    elif suffix == ".docx":
+        return _load_docx(file_path, source, progress_callback)
     else:
         raise ValueError(f"Unsupported file type: {suffix!r}")
-
-
-# ── PDF Loading ───────────────────────────────────────────────────────────────
 
 def _load_pdf(
     file_path: str,
@@ -140,3 +140,33 @@ def _emit(
             callback(step, pct, msg)
         except Exception:
             pass
+
+
+def _load_docx(
+    file_path: str,
+    source: str,
+    callback: Optional[ProgressCallback],
+) -> List[Document]:
+    _emit(callback, "ocr", 20, "Đang đọc nội dung file DOCX…")
+
+    loader = Docx2txtLoader(file_path)
+    raw_docs = loader.load()
+
+    documents: List[Document] = []
+    for i, doc in enumerate(raw_docs):
+        text = doc.page_content.strip()
+        if text:
+            documents.append(
+                Document(
+                    page_content=text,
+                    metadata={
+                        "source": source,
+                        "page": i + 1,
+                        "total_pages": len(raw_docs),
+                        "file_type": "docx",
+                    },
+                )
+            )
+
+    _emit(callback, "ocr_done", 65, f"Đã đọc {len(documents)} phần từ DOCX.")
+    return documents

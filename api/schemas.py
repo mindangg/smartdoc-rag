@@ -15,7 +15,15 @@ class UploadProgressEvent(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
-    session_id: str = Field(default="default", max_length=64)
+    session_id: str = Field(default="default", max_length=128)
+
+
+class HistoryItem(BaseModel):
+    id: int
+    question: str
+    rag_answer: Optional[str] = None
+    corag_answer: Optional[str] = None
+    created_at: str
 
 class Citation(BaseModel):
     id: int

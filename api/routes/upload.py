@@ -25,6 +25,7 @@ MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".png", ".jpg", ".jpeg",
     ".tiff", ".tif", ".bmp", ".webp",
+    ".docx",
 }
 
 TMP_DIR = Path("./data/uploads")

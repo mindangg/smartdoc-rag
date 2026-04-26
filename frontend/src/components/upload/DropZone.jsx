@@ -3,7 +3,7 @@ import useChatStore from '../../store/chatStore'
 import { uploadFile } from '../../services/api'
 import ProgressStepper from './ProgressStepper'
 
-const ACCEPTED = '.pdf,.png,.jpg,.jpeg,.tiff,.bmp,.webp'
+const ACCEPTED = '.pdf,.docx,.png,.jpg,.jpeg,.tiff,.bmp,.webp'
 
 const UPLOAD_STEPS_ORDER = [
   'reading_file',
@@ -115,7 +115,7 @@ export default function DropZone() {
         <div className="dropzone-hint">
           {isUploading
             ? 'Vui lòng chờ'
-            : 'PDF hoặc hình ảnh • Kéo thả hoặc click'}
+            : 'PDF, DOCX hoặc hình ảnh • Kéo thả hoặc click'}
         </div>
 
       </div>

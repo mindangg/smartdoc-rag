@@ -3,16 +3,28 @@
  */
 import { create } from 'zustand'
 
+function getSessionId() {
+  let id = sessionStorage.getItem('smartdoc_session_id')
+  if (!id) {
+    id = crypto.randomUUID()
+    sessionStorage.setItem('smartdoc_session_id', id)
+  }
+  return id
+}
+
 const useChatStore = create((set, get) => ({
-  // ── Documents ─────────────────────────────────────────────────────────────
+  sessionId: getSessionId(),
+
   documents: [],          // { id, name, chunks, vectors, uploadedAt }
   vectorCount: 0,
   addDocument: (doc) =>
     set((s) => ({ documents: [doc, ...s.documents] })),
   setVectorCount: (n) => set({ vectorCount: n }),
+  clearDocuments: () => set({ documents: [], vectorCount: 0 }),
 
   // ── Chat Messages ─────────────────────────────────────────────────────────
   messages: [],           // { id, role, ragContent, coragContent, ragCitations, coragCitations, usedWeb, ts, ragDone, coragDone }
+  setMessages: (msgs) => set({ messages: msgs }),
   addMessage: (msg) =>
     set((s) => ({ messages: [...s.messages, msg] })),
   updateLastAssistantMessage: (patch) =>

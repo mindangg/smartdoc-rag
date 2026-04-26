@@ -1,21 +1,56 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import useChatStore from '../../store/chatStore'
-import { queryDocuments } from '../../services/api'
+import { queryDocuments, fetchHistory, clearHistory } from '../../services/api'
 import MessageBubble from './MessageBubble'
 import QueryProgress from '../query/QueryProgress'
+import ConfirmDialog from '../ConfirmDialog'
 
 function now() {
   return new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Convert history DB items (newest-first) into message pairs for the chatbox */
+function historyToMessages(items) {
+  const msgs = []
+  // items are newest-first → reverse to show oldest at top
+  const chronological = [...items].reverse()
+  for (const item of chronological) {
+    const ts = item.created_at.replace('T', ' ').slice(0, 16)
+    msgs.push({
+      id: `hist-user-${item.id}`,
+      role: 'user',
+      content: item.question,
+      ts,
+      fromHistory: true,
+    })
+    msgs.push({
+      id: `hist-asst-${item.id}`,
+      role: 'assistant',
+      ragContent: item.rag_answer || '',
+      coragContent: item.corag_answer || '',
+      ragCitations: [],
+      coragCitations: [],
+      usedWeb: false,
+      ragDone: true,
+      coragDone: true,
+      ts,
+      fromHistory: true,
+    })
+  }
+  return msgs
+}
+
 export default function ChatPanel() {
   const [input, setInput] = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
 
   const {
     messages,
     addMessage,
+    setMessages,
     updateLastAssistantMessage,
     clearMessages,
     isQuerying,
@@ -23,9 +58,22 @@ export default function ChatPanel() {
     pushQueryStep,
     resetQuery,
     vectorCount,
+    sessionId,
   } = useChatStore()
 
-  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (historyLoaded) return
+    fetchHistory(sessionId)
+      .then((data) => {
+        const histMsgs = historyToMessages(data.items || [])
+        if (histMsgs.length > 0) {
+          setMessages(histMsgs)
+        }
+      })
+      .catch((err) => console.error('History load error:', err))
+      .finally(() => setHistoryLoaded(true))
+  }, [sessionId, historyLoaded, setMessages])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -46,7 +94,6 @@ export default function ChatPanel() {
       ts: now(),
     })
 
-    // Add placeholder assistant message (shows typing dots)
     addMessage({
       id: Date.now() + 1,
       role: 'assistant',
@@ -62,11 +109,10 @@ export default function ChatPanel() {
 
     await queryDocuments({
       question,
+      sessionId,
       onEvent: (data) => {
-        // Push to progress panel
         pushQueryStep(data)
 
-        // On final answer
         if (data.step === 'answer') {
           if (data.source === 'rag') {
             updateLastAssistantMessage({
@@ -93,8 +139,10 @@ export default function ChatPanel() {
             updateLastAssistantMessage({ coragContent: `Cảnh báo: ${data.message}`, coragDone: true })
           } else {
             updateLastAssistantMessage({
-              ragContent: `Cảnh báo: ${data.message}`, coragContent: `Cảnh báo: ${data.message}`,
-              ragDone: true, coragDone: true
+              ragContent: `Cảnh báo: ${data.message}`,
+              coragContent: `Cảnh báo: ${data.message}`,
+              ragDone: true,
+              coragDone: true,
             })
           }
         }
@@ -110,12 +158,11 @@ export default function ChatPanel() {
         pushQueryStep({ step: 'error', message: err.message })
       },
     })
-    
-    // Stream fully finished
+
     setIsQuerying(false)
     setTimeout(resetQuery, 3000)
   }, [
-    input, isQuerying, addMessage, updateLastAssistantMessage,
+    input, isQuerying, sessionId, addMessage, updateLastAssistantMessage,
     resetQuery, setIsQuerying, pushQueryStep,
   ])
 
@@ -126,7 +173,18 @@ export default function ChatPanel() {
     }
   }
 
+  const handleClearConfirmed = async () => {
+    clearMessages()
+    try {
+      await clearHistory(sessionId)
+    } catch (err) {
+      console.error('Failed to clear history:', err)
+    }
+    setConfirmClear(false)
+  }
+
   const canSend = input.trim().length > 0 && !isQuerying
+  const hasMessages = messages.length > 0
 
   return (
     <main className="chat-panel">
@@ -140,45 +198,35 @@ export default function ChatPanel() {
               : 'Upload tài liệu để bắt đầu'}
           </div>
         </div>
-        {messages.length > 0 && (
+
+        {hasMessages && (
           <button
             id="clear-chat-btn"
-            onClick={clearMessages}
-            title="Xóa cuộc hội thoại"
-            style={{
-              background: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--text-muted)',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              transition: 'var(--transition)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--rose-400)')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+            onClick={() => setConfirmClear(true)}
+            title="Xóa toàn bộ lịch sử chat"
+            className="chat-header-btn danger"
           >
-            Xóa
+            Xóa lịch sử
           </button>
         )}
       </div>
 
       {/* Messages */}
       <div className="chat-messages" id="chat-messages">
-        {messages.length === 0 ? (
+        {!hasMessages ? (
           <div className="empty-state">
-
             <div className="empty-state-title">SmartDoc RAG</div>
             <div className="empty-state-hint">
-              Upload tài liệu PDF hoặc hình ảnh ở thanh bên trái, rồi đặt câu hỏi về nội dung.
+              Upload tài liệu PDF, DOCX hoặc hình ảnh ở thanh bên trái, rồi đặt câu hỏi về nội dung.
               Hệ thống sẽ tự động đánh giá và kết hợp kết quả từ tài liệu + web (CoRAG).
             </div>
           </div>
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+          <>
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
+            ))}
+          </>
         )}
         <div ref={bottomRef} />
       </div>
@@ -203,9 +251,7 @@ export default function ChatPanel() {
             onKeyDown={onKeyDown}
             rows={1}
             disabled={isQuerying}
-            style={{
-              height: 'auto',
-            }}
+            style={{ height: 'auto' }}
             onInput={(e) => {
               e.target.style.height = 'auto'
               e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
@@ -225,6 +271,17 @@ export default function ChatPanel() {
           Shift+Enter để xuống dòng • Enter để gửi
         </div>
       </div>
+
+      {/* Confirm clear all history */}
+      <ConfirmDialog
+        open={confirmClear}
+        title="Xóa toàn bộ lịch sử chat?"
+        message="Tất cả tin nhắn trong phiên này sẽ bị xóa vĩnh viễn khỏi màn hình và cơ sở dữ liệu."
+        confirmLabel="Xóa tất cả"
+        danger
+        onConfirm={handleClearConfirmed}
+        onCancel={() => setConfirmClear(false)}
+      />
     </main>
   )
 }

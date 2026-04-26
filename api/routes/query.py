@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from api.schemas import QueryRequest
 from core.vector_store import get_document_count, get_vector_store
+from core.history_store import save_qa
 from features.corag.corag_chain import run_corag_with_streaming
 from core.rag_chain import run_rag_with_streaming
 
@@ -14,14 +15,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 @router.post("/query")
 async def query_documents(request: QueryRequest):
     question = request.question.strip()
-    logger.info(f"Query received: {question[:80]!r}  session={request.session_id}")
+    session_id = request.session_id
+    logger.info(f"Query received: {question[:80]!r}  session={session_id}")
 
     async def generate():
         queue: asyncio.Queue = asyncio.Queue()
         vector_store = get_vector_store()
+
+        # Collect final answers for history saving
+        answers: dict = {"rag": None, "corag": None}
 
         task_rag = asyncio.create_task(
             run_rag_with_streaming(question, vector_store, queue)
@@ -44,7 +50,27 @@ async def query_documents(request: QueryRequest):
             event = await queue.get()
             if event is None:
                 break
+
+            # Capture final answers for history
+            if event.get("step") == "answer":
+                src = event.get("source")
+                if src == "rag":
+                    answers["rag"] = event.get("answer")
+                elif src == "corag":
+                    answers["corag"] = event.get("answer")
+
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+        # Persist Q&A to history DB
+        try:
+            save_qa(
+                session_id=session_id,
+                question=question,
+                rag_answer=answers["rag"],
+                corag_answer=answers["corag"],
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to save history: {exc}")
 
     return StreamingResponse(
         generate(),
@@ -55,6 +81,7 @@ async def query_documents(request: QueryRequest):
             "Connection": "keep-alive",
         },
     )
+
 
 @router.get("/stats")
 async def get_stats():

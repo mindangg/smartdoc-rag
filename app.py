@@ -4,7 +4,8 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import upload, query
+from api.routes import upload, query, history
+from core.history_store import init_db
 
 app = FastAPI(
     title="SmartDoc RAG API",
@@ -26,7 +27,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def on_startup():
+    init_db()
+
 app.include_router(upload.router, prefix="/api", tags=["Document Upload"])
 app.include_router(query.router, prefix="/api", tags=["Query"])
-
-
+app.include_router(history.router, prefix="/api", tags=["History"])

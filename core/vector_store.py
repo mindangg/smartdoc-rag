@@ -1,4 +1,5 @@
 import os
+import shutil
 import logging
 from pathlib import Path
 from typing import List, Optional
@@ -71,3 +72,14 @@ def _save_to_disk(vs: FAISS) -> None:
     path.mkdir(parents=True, exist_ok=True)
     vs.save_local(str(path))
     logger.info(f"FAISS index saved to {path}.")
+
+
+def clear_vector_store() -> None:
+    global _vector_store
+    _vector_store = None
+    path = Path(FAISS_INDEX_PATH)
+    if path.exists():
+        shutil.rmtree(str(path))
+        logger.info(f"FAISS index deleted from {path}.")
+    else:
+        logger.info("No FAISS index found on disk — nothing to delete.")
